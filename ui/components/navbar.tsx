@@ -33,36 +33,6 @@ export function Navbar() {
                 variant="ghost"
                 className="text-sm font-medium text-white hover:text-cyan-300 transition-colors flex items-center gap-1 px-0"
               >
-                Earn <ChevronDown className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-slate-800 border-slate-700 text-white">
-              <DropdownMenuItem className="hover:bg-slate-700 cursor-pointer">
-                <Link href="/pools" className="w-full">
-                  Liquidity Pools
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem className="hover:bg-slate-700 cursor-pointer">
-                <Link href="/farms" className="w-full">
-                  Farms
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem className="hover:bg-slate-700 cursor-pointer">
-                <Link href="/staking" className="w-full">
-                  Staking
-                </Link>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Link href="/analytics" className="text-sm font-medium text-white hover:text-cyan-300 transition-colors">
-            Analytics
-          </Link>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                className="text-sm font-medium text-white hover:text-cyan-300 transition-colors flex items-center gap-1 px-0"
-              >
                 More <ChevronDown className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -75,11 +45,6 @@ export function Navbar() {
               <DropdownMenuItem className="hover:bg-slate-700 cursor-pointer">
                 <Link href="/docs" className="w-full">
                   Docs
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem className="hover:bg-slate-700 cursor-pointer">
-                <Link href="/governance" className="w-full">
-                  Governance
                 </Link>
               </DropdownMenuItem>
             </DropdownMenuContent>

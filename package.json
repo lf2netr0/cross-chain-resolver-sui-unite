@@ -4,6 +4,8 @@
   "description": "Example of 1inch cross chain resolver",
   "scripts": {
     "test": "forge build && node --experimental-vm-modules ./node_modules/jest/bin/jest.js",
+    "test:cross-chain-sui": "forge build && node --experimental-vm-modules ./node_modules/jest/bin/jest.js tests/cross-chain-sui.spec.ts --testTimeout=120000",
+    "setup:sui": "./setup-sui-localnet.sh",
     "lint": "eslint  \"tests/**/*.ts\""
   },
   "devDependencies": {

@@ -207,4 +207,14 @@ module cross_chain_swap::timelock {
     public fun stage_to_u8(stage: &Stage): u8 {
         stage.value
     }
+
+    /// Create timelocks from raw data (for TypeScript integration)
+    public fun from_data(data: u256): Timelocks {
+        Timelocks { data }
+    }
+
+    /// Get raw data from timelocks (for testing and integration)
+    public fun get_data(timelocks: &Timelocks): u256 {
+        timelocks.data
+    }
 } 

@@ -8,10 +8,15 @@ module cross_chain_swap::escrow_factory {
     use sui::dynamic_field as df;
     use sui::event;
     use sui::balance::{Self, Balance};
+    use sui::hash::{Self};
+    use sui::bcs::{Self};
+    use sui::ecdsa_k1::{Self};
+    use std::option::{Self, Option};
     use cross_chain_swap::base_escrow::{Self, Immutables};
-    use cross_chain_swap::escrow_src::{Self};
-    use cross_chain_swap::escrow_dst::{Self};
+    use cross_chain_swap::escrow_src::{Self, EscrowSrc};
+    use cross_chain_swap::escrow_dst::{Self, EscrowDst};
     use cross_chain_swap::timelock::{Self};
+    use std::address;
 
     // ========== One-Time Witness ==========
     public struct ESCROW_FACTORY has drop {}
@@ -22,6 +27,11 @@ module cross_chain_swap::escrow_factory {
     const E_ESCROW_TYPE_MISMATCH: u64 = 3;
     const E_UNAUTHORIZED: u64 = 4;
     const E_INVALID_IMMUTABLES: u64 = 5;
+    const E_INVALID_SIGNATURE: u64 = 6;
+    const E_INVALID_OBJECT_ID: u64 = 7;
+    const E_INVALID_SECRET: u64 = 8;
+    const E_TIMELOCK_NOT_EXPIRED: u64 = 9;
+    const E_INVALID_HASHLOCK: u64 = 10;
 
     // ========== Capabilities ==========
     
@@ -46,8 +56,9 @@ module cross_chain_swap::escrow_factory {
 
     // ========== Dynamic Field Keys ==========
     
+    // 使用 immutable hash 作為 escrow key
     public struct EscrowKey has copy, drop, store {
-        order_hash: vector<u8>,
+        immutable_hash: vector<u8>,
         is_src: bool,
     }
 
@@ -86,6 +97,21 @@ module cross_chain_swap::escrow_factory {
         taker: address,
         src_token_amount: u64,
         dst_token_amount: u64,
+    }
+
+    public struct EscrowWithdrawal has copy, drop {
+        escrow_id: address,
+        order_hash: vector<u8>,
+        secret_hash: vector<u8>,
+        withdrawer: address,
+        is_src: bool,
+    }
+
+    public struct EscrowCancellation has copy, drop {
+        escrow_id: address,
+        order_hash: vector<u8>,
+        canceller: address,
+        is_src: bool,
     }
 
     // ========== Initialization ==========
@@ -143,18 +169,19 @@ module cross_chain_swap::escrow_factory {
         factory: &mut Factory,
         cap: &FactoryCap,
         tokens: Coin<T>,
-        safety_deposit: Coin<SUI>,
+        safety_deposit: Coin<SUI>,  
         immutables: Immutables,
         clock: &Clock,
         ctx: &mut TxContext
-    ): address {
+    ): EscrowSrc<T> {
         // Verify factory capability
         assert!(cap.factory_id == object::uid_to_address(&factory.id), E_FACTORY_MISMATCH);
         
-        // Validate immutables hash to ensure consistency
+        // 使用 immutable hash 作為 key
         let order_hash = base_escrow::order_hash(&immutables);
+        let immutable_hash = hash::keccak256(&bcs::to_bytes(&immutables));
         
-        let escrow_key = EscrowKey { order_hash, is_src: true };
+        let escrow_key = EscrowKey { immutable_hash, is_src: true };
         assert!(!df::exists_(&factory.id, escrow_key), E_ESCROW_EXISTS);
 
         // Set deployment timestamp in timelocks
@@ -183,7 +210,7 @@ module cross_chain_swap::escrow_factory {
         let escrow_id = object::id(&escrow);
         let escrow_address = object::id_to_address(&escrow_id);
 
-        // Store escrow reference
+        // Store escrow reference using immutable hash
         df::add(&mut factory.id, escrow_key, escrow_address);
 
         // Update stats
@@ -204,9 +231,7 @@ module cross_chain_swap::escrow_factory {
             safety_amount: base_escrow::safety_deposit(&updated_immutables),
         });
 
-        // Transfer escrow to its own address for access
-        transfer::public_transfer(escrow, escrow_address);
-        escrow_address
+        escrow
     }
 
     /// Create destination escrow for cross-chain swap
@@ -219,14 +244,15 @@ module cross_chain_swap::escrow_factory {
         immutables: Immutables,
         clock: &Clock,
         ctx: &mut TxContext
-    ): address {
+    ): EscrowDst<T> {
         // Verify factory capability
         assert!(cap.factory_id == object::uid_to_address(&factory.id), E_FACTORY_MISMATCH);
         
-        // Validate immutables hash to ensure consistency
+        // 使用 immutable hash 作為 key
         let order_hash = base_escrow::order_hash(&immutables);
+        let immutable_hash = hash::keccak256(&bcs::to_bytes(&immutables));
         
-        let escrow_key = EscrowKey { order_hash, is_src: false };
+        let escrow_key = EscrowKey { immutable_hash, is_src: false };
         assert!(!df::exists_(&factory.id, escrow_key), E_ESCROW_EXISTS);
 
         // Set deployment timestamp in timelocks
@@ -255,7 +281,7 @@ module cross_chain_swap::escrow_factory {
         let escrow_id = object::id(&escrow);
         let escrow_address = object::id_to_address(&escrow_id);
 
-        // Store escrow reference
+        // Store escrow reference using immutable hash
         df::add(&mut factory.id, escrow_key, escrow_address);
 
         // Update stats
@@ -276,67 +302,42 @@ module cross_chain_swap::escrow_factory {
             safety_amount: base_escrow::safety_deposit(&updated_immutables),
         });
 
-        // Transfer escrow to its own address for access
-        transfer::public_transfer(escrow, escrow_address);
-        escrow_address
+        escrow
     }
 
-    /// Initiate cross-chain swap by creating both source and destination escrows
-    /// This is a convenience function for atomic cross-chain swap setup
-    public fun initiate_cross_chain_swap<TSrc, TDst>(
-        factory: &mut Factory,
-        cap: &FactoryCap,
-        src_tokens: Coin<TSrc>,
-        src_safety: Coin<SUI>,
-        dst_tokens: Coin<TDst>,
-        dst_safety: Coin<SUI>,
-        src_immutables: Immutables,
-        dst_immutables: Immutables,
-        clock: &Clock,
-        ctx: &mut TxContext
-    ): (address, address) {
-        // Verify that the immutables represent a valid cross-chain swap pair
-        assert!(base_escrow::verify_cross_chain_compatibility(&src_immutables, &dst_immutables), E_INVALID_IMMUTABLES);
 
-        // Create source escrow
-        let src_escrow_id = create_src_escrow(
-            factory,
-            cap,
-            src_tokens,
-            src_safety,
-            src_immutables,
-            clock,
-            ctx
-        );
 
-        // Create destination escrow
-        let dst_escrow_id = create_dst_escrow(
-            factory,
-            cap,
-            dst_tokens,
-            dst_safety,
-            dst_immutables,
-            clock,
-            ctx
-        );
+    // ========== Public Escrow Operations ==========
 
-        // Update cross-chain swap counter
-        let stats = df::borrow_mut<StatsKey, Stats>(&mut factory.id, StatsKey {});
-        stats.cross_chain_swaps = stats.cross_chain_swaps + 1;
-
-        // Emit cross-chain swap event
-        event::emit(CrossChainSwapInitiated {
-            src_escrow_id,
-            dst_escrow_id,
-            order_hash: base_escrow::order_hash(&src_immutables),
-            maker: base_escrow::maker(&src_immutables),
-            taker: base_escrow::taker(&src_immutables),
-            src_token_amount: base_escrow::amount(&src_immutables),
-            dst_token_amount: base_escrow::amount(&dst_immutables),
-        });
-
-        (src_escrow_id, dst_escrow_id)
+    /// Verify escrow object ID matches factory records using immutables
+    /// This ensures operations are performed on legitimate escrow objects
+    public fun verify_escrow_binding(
+        factory: &Factory,
+        escrow_id: address,
+        immutables: &Immutables,
+        is_src: bool
+    ): bool {
+        let immutable_hash = hash::keccak256(&bcs::to_bytes(immutables));
+        let escrow_key = EscrowKey { immutable_hash, is_src };
+        
+        if (df::exists_(&factory.id, escrow_key)) {
+            let stored_escrow_id = *df::borrow<EscrowKey, address>(&factory.id, escrow_key);
+            stored_escrow_id == escrow_id
+        } else {
+            false
+        }
     }
+
+    /// Verify secret matches immutable hashlock
+    /// This provides cryptographic proof for withdrawal authorization
+    public fun verify_secret(
+        secret: &vector<u8>,
+        immutables: &Immutables
+    ): bool {
+        let secret_hash = hash::keccak256(secret);
+        secret_hash == base_escrow::hashlock(immutables)
+    }
+
 
     // ========== Admin Functions ==========
 
@@ -365,13 +366,15 @@ module cross_chain_swap::escrow_factory {
 
     // ========== Query Functions ==========
 
-    /// Get escrow address by order hash and type
+    /// Get escrow address by immutables and type
     public fun get_escrow_address(
         factory: &Factory,
-        order_hash: vector<u8>,
+        immutables: &Immutables,
         is_src: bool
     ): Option<address> {
-        let escrow_key = EscrowKey { order_hash, is_src };
+        let immutable_hash = hash::keccak256(&bcs::to_bytes(immutables));
+        let escrow_key = EscrowKey { immutable_hash, is_src };
+        
         if (df::exists_(&factory.id, escrow_key)) {
             option::some(*df::borrow<EscrowKey, address>(&factory.id, escrow_key))
         } else {
@@ -385,13 +388,14 @@ module cross_chain_swap::escrow_factory {
         (stats.total_escrows_created, stats.total_volume, stats.active_escrows, stats.cross_chain_swaps)
     }
 
-    /// Check if escrow exists
+    /// Check if escrow exists using immutables
     public fun escrow_exists(
         factory: &Factory,
-        order_hash: vector<u8>,
+        immutables: &Immutables,
         is_src: bool
     ): bool {
-        let escrow_key = EscrowKey { order_hash, is_src };
+        let immutable_hash = hash::keccak256(&bcs::to_bytes(immutables));
+        let escrow_key = EscrowKey { immutable_hash, is_src };
         df::exists_(&factory.id, escrow_key)
     }
 
@@ -412,13 +416,15 @@ module cross_chain_swap::escrow_factory {
 
     // ========== Package-only Functions ==========
     
-    /// Remove escrow reference after completion (package-only for cleanup)
+    /// Remove escrow reference after completion using immutables
     public(package) fun remove_escrow_reference(
         factory: &mut Factory,
-        order_hash: vector<u8>,
+        immutables: &Immutables,
         is_src: bool,
     ) {
-        let escrow_key = EscrowKey { order_hash, is_src };
+        let immutable_hash = hash::keccak256(&bcs::to_bytes(immutables));
+        let escrow_key = EscrowKey { immutable_hash, is_src };
+        
         if (df::exists_(&factory.id, escrow_key)) {
             df::remove<EscrowKey, address>(&mut factory.id, escrow_key);
             
@@ -460,7 +466,78 @@ module cross_chain_swap::escrow_factory {
         )
     }
 
+    // ========== Helper Functions for TypeScript Integration ==========
+
+    /// Create source escrow with individual immutable fields (for TypeScript)
+    public fun create_src_escrow_with_fields<T>(
+        factory: &mut Factory,
+        cap: &FactoryCap,
+        tokens: Coin<T>,
+        safety_deposit: Coin<SUI>,
+        order_hash: vector<u8>,
+        hashlock: vector<u8>,
+        maker: address,
+        taker: address,
+        token: address,
+        amount: u64,
+        safety_deposit_amount: u64,
+        timelocks_data: u256,
+        clock: &Clock,
+        ctx: &mut TxContext
+    ): EscrowSrc<T> {
+        // Construct Immutables from individual fields
+        let timelocks = timelock::from_data(timelocks_data);
+        let immutables = base_escrow::new_immutables(
+            order_hash,
+            hashlock,
+            maker,
+            taker,
+            token,
+            amount,
+            safety_deposit_amount,
+            timelocks,
+        );
+        
+        // Call the main function
+        create_src_escrow(factory, cap, tokens, safety_deposit, immutables, clock, ctx)
+    }
+
+    /// Create destination escrow with individual immutable fields (for TypeScript)
+    public fun create_dst_escrow_with_fields<T>(
+        factory: &mut Factory,
+        cap: &FactoryCap,
+        tokens: Coin<T>,
+        safety_deposit: Coin<SUI>,
+        order_hash: vector<u8>,
+        hashlock: vector<u8>,
+        maker: address,
+        taker: address,
+        token: address,
+        amount: u64,
+        safety_deposit_amount: u64,
+        timelocks_data: u256,
+        clock: &Clock,
+        ctx: &mut TxContext
+    ): EscrowDst<T> {
+        // Construct Immutables from individual fields
+        let timelocks = timelock::from_data(timelocks_data);
+        let immutables = base_escrow::new_immutables(
+            order_hash,
+            hashlock,
+            maker,
+            taker,
+            token,
+            amount,
+            safety_deposit_amount,
+            timelocks,
+        );
+        
+        // Call the main function
+        create_dst_escrow(factory, cap, tokens, safety_deposit, immutables, clock, ctx)
+    }
+
     // ========== Test Helper Functions ==========
+
 
     #[test_only]
     public fun create_test_factory(ctx: &mut TxContext): (Factory, AdminCap, FactoryCap) {

@@ -1,0 +1,28 @@
+{
+  "timestamp": "2025-08-03T12:10:58.962Z",
+  "bsc": {
+    "network": "localhost:8545",
+    "chainId": 56,
+    "escrowFactory": "0xCeE4339473B18554e9A86A084E7746B7F0b5d447",
+    "resolver": "0x4B1a622153c2d5F4D97919355EdbB63DF0502Ab2",
+    "limitOrderProtocol": "0x111111125421ca6dc452d289314280a0f8842a65",
+    "wrappedNative": "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c",
+    "provider": "http://localhost:8545"
+  },
+  "sui": {
+    "network": "testnet",
+    "rpcUrl": "https://fullnode.testnet.sui.io",
+    "packageId": "0x2592ed036d1e2ed7b99f275661d380bab20ad12ed580e0d2fbc6ff1dd5689c16",
+    "factoryId": "0x3e65544f43f33a65bcbace90ca9d26223675a547411036d04d0ad31a9a54f606",
+    "capId": "0xbfb7738f1575dfa98eff164339d29dd2a1961831780dd8a6c1bf538eb7dc8a34",
+    "poolId": "0x3169bf8acdc8eb374feae9af7568e2a2500e35d71fcf9072d503930f3d1b6a95",
+    "resolverAddress": "0x12647ac3d891392c70d44413cd64416b12706f36c7a1c451bede148d6113f842"
+  },
+  "accounts": {
+    "bscResolver": "0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a",
+    "suiResolver": "AMibztYzaXNAxKhSwzgEeDNlQ0R15rdNn+NiAs09WjSw",
+    "bscUser": "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d",
+    "suiUser": "AHLX+LXvk/AllRmmchLt6fn9EGHaXccSr92Kqu0vCUH8"
+  },
+  "deploymentType": "full"
+}

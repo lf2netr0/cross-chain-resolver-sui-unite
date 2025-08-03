@@ -13,7 +13,7 @@ import Link from "next/link"
 import { CrossChainTokenSelector } from "./cross-chain-token-selector"
 import { useCrossChainTokens, type CrossChainToken } from "./cross-chain-token-provider"
 import { useAccount } from "wagmi"
-import { useSuiWallet } from "./sui-wallet-provider"
+import { useSuiAccount } from "./sui-wallet-provider"
 
 interface SwapInterfaceProps {
   initialFromToken?: CrossChainToken
@@ -23,7 +23,7 @@ interface SwapInterfaceProps {
 export default function SwapInterface({ initialFromToken, initialToToken }: SwapInterfaceProps) {
   const { tokens } = useCrossChainTokens()
   const { isConnected: isEvmConnected } = useAccount()
-  const { isSuiConnected } = useSuiWallet()
+  const { isConnected: isSuiConnected } = useSuiAccount()
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [fromToken, setFromToken] = useState<CrossChainToken>(
     initialFromToken || tokens.find((t) => t.chain === "BSC") || tokens[0],
@@ -80,7 +80,7 @@ export default function SwapInterface({ initialFromToken, initialToToken }: Swap
     setToAmount(fromAmount)
   }
 
-  const handleSwap = () => {
+  const handleSwap = async () => {
     const isWalletConnectedForToken = (token: CrossChainToken) => {
       if (token.chain === "BSC") return isEvmConnected
       if (token.chain === "SUI") return isSuiConnected
@@ -96,11 +96,48 @@ export default function SwapInterface({ initialFromToken, initialToToken }: Swap
       return
     }
 
-    // This would be replaced with actual swap logic in a real app
-    toast({
-      title: "Swap initiated",
-      description: `Swapping ${fromAmount} ${fromToken.symbol} for approximately ${toAmount} ${toToken.symbol}`,
-    })
+    // Determine if this is a Sui->BSC or BSC->Sui swap
+    const isSuiToBsc = fromToken.chain === "SUI" && toToken.chain === "BSC"
+    const isBscToSui = fromToken.chain === "BSC" && toToken.chain === "SUI"
+
+    if (!isSuiToBsc && !isBscToSui) {
+      toast({
+        title: "Invalid Swap Pair",
+        description: "Only BSC ↔ Sui swaps are currently supported",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      if (isSuiToBsc) {
+        // Sui -> BSC: Create order in Sui OrderPool
+        toast({
+          title: "Creating Order on Sui",
+          description: `Creating cross-chain order: ${fromAmount} ${fromToken.symbol} → ${toAmount} ${toToken.symbol}`,
+        })
+        
+        // This will redirect to the OrderPool interface
+        window.location.href = `/cross-chain?tab=orderbook&from=${fromToken.id}&to=${toToken.id}&amount=${fromAmount}`
+      } else if (isBscToSui) {
+        // BSC -> Sui: Create escrow on BSC (simplified for demo)
+        toast({
+          title: "BSC → Sui Swap",
+          description: `Initiating cross-chain swap: ${fromAmount} ${fromToken.symbol} → ${toAmount} ${toToken.symbol}`,
+        })
+        
+        // This would integrate with BSC escrow contracts
+        // For now, redirect to cross-chain interface
+        window.location.href = `/cross-chain?tab=orderbook&from=${fromToken.id}&to=${toToken.id}&amount=${fromAmount}`
+      }
+    } catch (error) {
+      console.error("Swap failed:", error)
+      toast({
+        title: "Swap Failed",
+        description: error instanceof Error ? error.message : "Unknown error occurred",
+        variant: "destructive",
+      })
+    }
   }
 
   const isWalletConnectedForToken = (token: CrossChainToken) => {
@@ -272,7 +309,11 @@ export default function SwapInterface({ initialFromToken, initialToToken }: Swap
                         ? "Enter an amount"
                         : Number.parseFloat(fromAmount) > fromToken?.balance
                           ? "Insufficient balance"
-                          : `Bridge ${fromToken.symbol} to ${toToken.symbol}`}
+                          : fromToken.chain === "SUI" && toToken.chain === "BSC"
+                            ? `Create Order: ${fromToken.symbol} → ${toToken.symbol}`
+                            : fromToken.chain === "BSC" && toToken.chain === "SUI"
+                              ? `Cross-Chain Swap: ${fromToken.symbol} → ${toToken.symbol}`
+                              : `Bridge ${fromToken.symbol} to ${toToken.symbol}`}
                   </Button>
 
                   {/* Recent Transactions */}

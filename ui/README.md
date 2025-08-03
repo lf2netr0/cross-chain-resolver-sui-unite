@@ -6,7 +6,11 @@ MoveB is a cross-chain bridge interface connecting BSC (Binance Smart Chain) and
 ## Features
 
 - **Cross-Chain Bridging**: Bridge tokens between BSC and Sui networks
-- **Dual Wallet Support**: Connect both EVM wallets (MetaMask, etc.) and Sui wallets
+- **Sui Wallet Standard Support**: Full integration with Sui Wallet Standard for multi-wallet compatibility
+- **OrderPool System**: Competitive resolver bidding for cross-chain swaps
+- **Fusion+ Compatible**: Complete alignment with 1inch Fusion+ protocol
+- **HTLC Security**: Hash Time-Locked Contracts ensure atomic swap safety
+- **Multi-Network Support**: Sui Mainnet, Testnet, and Devnet
 - **Token Swapping**: Swap tokens across different blockchains
 - **Multi-chain Portfolio**: Track your assets across BSC and Sui
 - **Responsive Design**: Fully responsive interface for desktop and mobile
@@ -16,10 +20,12 @@ MoveB is a cross-chain bridge interface connecting BSC (Binance Smart Chain) and
 
 - **Frontend**: Next.js 14 (App Router), React 18
 - **Styling**: Tailwind CSS, shadcn/ui components
-- **Wallet Connection**: RainbowKit, wagmi
+- **EVM Wallet Connection**: RainbowKit, wagmi
+- **Sui Wallet Connection**: @mysten/wallet-standard, @mysten/dapp-kit
+- **Sui Blockchain**: @mysten/sui (client & transactions)
 - **State Management**: React Context API
 - **Data Fetching**: TanStack Query (React Query)
-- **Blockchain Interaction**: viem
+- **Blockchain Interaction**: viem (EVM), Sui Client (Sui)
 - **Type Safety**: TypeScript
 
 ## Getting Started
@@ -195,6 +201,38 @@ For testing wallet connections, you can use the following test wallets:
 - Coinbase Wallet: Install the Coinbase Wallet browser extension
 - For other wallets, you can use their respective test environments
 
+## Sui Wallet Integration
+
+MoveB includes comprehensive Sui wallet support following the Wallet Standard:
+
+### Supported Features
+- **Multi-Wallet Support**: Automatically detects and connects to any Sui Wallet Standard compatible wallet
+- **Network Switching**: Support for Sui Mainnet, Testnet, and Devnet
+- **Transaction Signing**: Full support for Sui transaction signing and execution
+- **Balance Tracking**: Real-time balance updates for connected accounts
+- **OrderPool Integration**: Direct interaction with Sui cross-chain OrderPool contracts
+
+### Available Pages
+- `/sui-demo` - Comprehensive Sui wallet feature demonstration
+- `/cross-chain` - Cross-chain swap interface with OrderPool integration
+
+### Components
+- `SuiWalletProvider` - Context provider for wallet state management
+- `SuiWalletConnection` - Main wallet connection interface
+- `SuiNetworkSwitcher` - Network switching component
+- `SuiOrderPool` - Cross-chain order creation and management
+
+### Usage Example
+```tsx
+import { SuiWalletProvider, useSuiWallet } from './components/sui-wallet-provider'
+
+function MyComponent() {
+  const { connect, isConnected, signAndExecuteTransaction } = useSuiWallet()
+  
+  // Use wallet functionality
+}
+```
+
 ## Security
 
 MoveB implements several security measures:
@@ -203,6 +241,8 @@ MoveB implements several security measures:
 - No private keys are stored in the application
 - All connections are secured with HTTPS
 - Smart contract interactions are validated before execution
+- Hash Time-Locked Contracts (HTLC) for atomic cross-chain swaps
+- Multi-signature validation for order execution
 
 ## Performance Optimization
 

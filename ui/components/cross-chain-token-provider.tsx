@@ -12,6 +12,7 @@ export interface CrossChainToken {
   chain: "BSC" | "SUI"
   chainLogo: string
   contractAddress?: string
+  decimals?: number
 }
 
 interface CrossChainTokenContextType {
@@ -36,6 +37,7 @@ export function CrossChainTokenProvider({ children }: { children: ReactNode }) {
       chain: "BSC",
       chainLogo: "/placeholder.svg?height=20&width=20",
       contractAddress: "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
+      decimals: 18,
     },
     {
       id: "bsc-bnb",
@@ -46,6 +48,7 @@ export function CrossChainTokenProvider({ children }: { children: ReactNode }) {
       price: 320,
       chain: "BSC",
       chainLogo: "/placeholder.svg?height=20&width=20",
+      decimals: 18,
     },
     {
       id: "bsc-busd",
@@ -57,6 +60,7 @@ export function CrossChainTokenProvider({ children }: { children: ReactNode }) {
       chain: "BSC",
       chainLogo: "/placeholder.svg?height=20&width=20",
       contractAddress: "0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56",
+      decimals: 18,
     },
 
     // Sui Tokens
@@ -69,6 +73,7 @@ export function CrossChainTokenProvider({ children }: { children: ReactNode }) {
       price: 2.1,
       chain: "SUI",
       chainLogo: "/placeholder.svg?height=20&width=20",
+      decimals: 9,
     },
     {
       id: "sui-usdc",
@@ -79,6 +84,7 @@ export function CrossChainTokenProvider({ children }: { children: ReactNode }) {
       price: 1,
       chain: "SUI",
       chainLogo: "/placeholder.svg?height=20&width=20",
+      decimals: 6,
     },
     {
       id: "sui-usdt",
@@ -89,6 +95,7 @@ export function CrossChainTokenProvider({ children }: { children: ReactNode }) {
       price: 1,
       chain: "SUI",
       chainLogo: "/placeholder.svg?height=20&width=20",
+      decimals: 6,
     },
   ])
 

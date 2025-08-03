@@ -3,9 +3,10 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { useConnect, useDisconnect, useAccount, useBalance } from "wagmi"
-import { useSuiWallet } from "./sui-wallet-provider"
+import { useSuiAccount, useSuiNetwork, useSuiWallet } from "./sui-wallet-provider"
 import { toast } from "./ui/use-toast"
-import { Copy, ExternalLink, LogOut, Download } from "lucide-react"
+import { Copy, ExternalLink, LogOut, Download, Wallet } from "lucide-react"
+import { useState } from "react"
 
 interface CrossChainWalletModalProps {
   isOpen: boolean
@@ -19,8 +20,12 @@ export function CrossChainWalletModal({ isOpen, onClose, view }: CrossChainWalle
   const { address: evmAddress, isConnected: isEvmConnected } = useAccount()
   const { data: evmBalance } = useBalance({ address: evmAddress })
 
-  const { suiAddress, isSuiConnected, connectSlushWallet, disconnectSlushWallet, isSlushWalletAvailable } =
-    useSuiWallet()
+  // Sui Wallet Standard hooks
+  const { address: suiAddress, isConnected: isSuiConnected, wallet: suiWallet } = useSuiAccount()
+  const { network: suiNetwork, networkInfo } = useSuiNetwork()
+  const { wallets, connect: connectSuiWallet, disconnect: disconnectSuiWallet, isConnecting } = useSuiWallet()
+
+  const [suiConnecting, setSuiConnecting] = useState(false)
 
   // Format address for display
   const formatAddress = (address?: string | null) => {
@@ -28,8 +33,47 @@ export function CrossChainWalletModal({ isOpen, onClose, view }: CrossChainWalle
     return `${address.slice(0, 6)}...${address.slice(-4)}`
   }
 
+  // Handle Sui wallet connection
+  const handleSuiConnect = async (wallet: any) => {
+    setSuiConnecting(true)
+    try {
+      await connectSuiWallet(wallet)
+      toast({
+        title: "Wallet Connected",
+        description: `${wallet.name} connected successfully`,
+      })
+    } catch (error) {
+      console.error('Failed to connect Sui wallet:', error)
+      toast({
+        title: "Connection Failed",
+        description: "Failed to connect to Sui wallet",
+        variant: "destructive",
+      })
+    } finally {
+      setSuiConnecting(false)
+    }
+  }
+
+  // Handle Sui wallet disconnection
+  const handleSuiDisconnect = async () => {
+    try {
+      await disconnectSuiWallet()
+      toast({
+        title: "Wallet Disconnected",
+        description: "Sui wallet disconnected successfully",
+      })
+    } catch (error) {
+      console.error('Failed to disconnect Sui wallet:', error)
+      toast({
+        title: "Disconnection Failed",
+        description: "Failed to disconnect Sui wallet",
+        variant: "destructive",
+      })
+    }
+  }
+
   // Copy address to clipboard
-  const copyAddress = (address: string | null, type: string) => {
+  const copyAddress = (address: string | null | undefined, type: string) => {
     if (address) {
       navigator.clipboard.writeText(address)
       toast({
@@ -93,19 +137,22 @@ export function CrossChainWalletModal({ isOpen, onClose, view }: CrossChainWalle
                 )}
               </div>
 
-              {/* Slush Wallet Section */}
+              {/* Sui Wallets Section */}
               <div>
-                <h3 className="text-lg font-medium mb-3 text-blue-400">Sui Wallet (Slush)</h3>
+                <h3 className="text-lg font-medium mb-3 text-blue-400">Sui Wallets</h3>
                 {isSuiConnected ? (
                   <div className="p-3 bg-slate-700 rounded-lg flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="w-3 h-3 rounded-full bg-blue-400"></div>
-                      <span className="text-sm">Connected: {formatAddress(suiAddress)}</span>
+                      {suiWallet?.icon && (
+                        <img src={suiWallet.icon} alt={suiWallet.name} className="h-4 w-4" />
+                      )}
+                      <span className="text-sm">Connected: {formatAddress(suiAddress)} ({suiWallet?.name})</span>
                     </div>
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => disconnectSlushWallet()}
+                      onClick={handleSuiDisconnect}
                       className="bg-slate-600 border-slate-500 hover:bg-slate-500 text-white"
                     >
                       Disconnect
@@ -113,34 +160,53 @@ export function CrossChainWalletModal({ isOpen, onClose, view }: CrossChainWalle
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {isSlushWalletAvailable ? (
-                      <Button
-                        onClick={() => connectSlushWallet()}
-                        className="flex justify-between items-center w-full bg-slate-700 hover:bg-slate-600"
-                      >
-                        <span>Slush Wallet</span>
-                        <div className="flex items-center gap-2">
-                          <img src="/placeholder.svg?height=24&width=24" alt="Slush Wallet" className="h-6 w-6" />
-                        </div>
-                      </Button>
+                    {wallets.length > 0 ? (
+                      wallets.map((wallet) => (
+                        <Button
+                          key={wallet.name}
+                          onClick={() => handleSuiConnect(wallet)}
+                          disabled={suiConnecting || isConnecting}
+                          className="flex justify-between items-center w-full bg-slate-700 hover:bg-slate-600 disabled:opacity-50"
+                        >
+                          <span>{wallet.name}</span>
+                          <div className="flex items-center gap-2">
+                            {wallet.icon ? (
+                              <img src={wallet.icon} alt={wallet.name} className="h-6 w-6" />
+                            ) : (
+                              <Wallet className="h-6 w-6" />
+                            )}
+                          </div>
+                        </Button>
+                      ))
                     ) : (
                       <div className="p-3 bg-slate-700/50 rounded-lg">
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm text-slate-300">Slush Wallet</span>
+                          <span className="text-sm text-slate-300">No Sui Wallets</span>
                           <span className="text-xs text-red-400">Not Available</span>
                         </div>
                         <p className="text-xs text-slate-400 mb-3">
-                          Slush Wallet is required to connect to the Sui network
+                          Install a Sui wallet to connect to the Sui network
                         </p>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full bg-slate-600 border-slate-500 hover:bg-slate-500 text-white"
-                          onClick={() => window.open("https://slush.so/", "_blank")}
-                        >
-                          <Download className="mr-2 h-4 w-4" />
-                          Install Slush Wallet
-                        </Button>
+                        <div className="space-y-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full bg-slate-600 border-slate-500 hover:bg-slate-500 text-white"
+                            onClick={() => window.open("https://chrome.google.com/webstore/detail/sui-wallet/opcgpfmipidbgpenhmajoajpbobppdil", "_blank")}
+                          >
+                            <Download className="mr-2 h-4 w-4" />
+                            Install Sui Wallet
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full bg-slate-600 border-slate-500 hover:bg-slate-500 text-white"
+                            onClick={() => window.open("https://suiet.app/", "_blank")}
+                          >
+                            <Download className="mr-2 h-4 w-4" />
+                            Install Suiet Wallet
+                          </Button>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -166,12 +232,21 @@ export function CrossChainWalletModal({ isOpen, onClose, view }: CrossChainWalle
                   <div>
                     • For Sui: Install{" "}
                     <a
-                      href="https://slush.so/"
+                      href="https://chrome.google.com/webstore/detail/sui-wallet/opcgpfmipidbgpenhmajoajpbobppdil"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-cyan-400 hover:text-cyan-300"
                     >
-                      Slush Wallet
+                      Sui Wallet
+                    </a>
+                    {" or "}
+                    <a
+                      href="https://suiet.app/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-cyan-400 hover:text-cyan-300"
+                    >
+                      Suiet
                     </a>
                   </div>
                 </div>
@@ -237,17 +312,21 @@ export function CrossChainWalletModal({ isOpen, onClose, view }: CrossChainWalle
         {view === "sui-account" && isSuiConnected && (
           <>
             <DialogHeader>
-              <DialogTitle>Slush Wallet (Sui)</DialogTitle>
+              <DialogTitle>{suiWallet?.name || "Sui Wallet"}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="flex items-center justify-between p-3 bg-slate-700 rounded-lg">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
-                    <img src="/placeholder.svg?height=20&width=20" alt="Slush" className="h-5 w-5" />
+                    {suiWallet?.icon ? (
+                      <img src={suiWallet.icon} alt={suiWallet.name} className="h-6 w-6" />
+                    ) : (
+                      <Wallet className="h-5 w-5 text-white" />
+                    )}
                   </div>
                   <div>
                     <p className="text-sm text-slate-400">{formatAddress(suiAddress)}</p>
-                    <p className="text-sm font-medium">Sui Network</p>
+                    <p className="text-sm font-medium">{networkInfo.name}</p>
                   </div>
                 </div>
               </div>
@@ -264,7 +343,7 @@ export function CrossChainWalletModal({ isOpen, onClose, view }: CrossChainWalle
                 <Button
                   variant="outline"
                   className="flex-1 bg-slate-700 border-slate-600 hover:bg-slate-600 text-white"
-                  onClick={() => window.open(`https://suiexplorer.com/address/${suiAddress}`, "_blank")}
+                  onClick={() => window.open(`https://suiexplorer.com/address/${suiAddress}?network=${suiNetwork}`, "_blank")}
                 >
                   <ExternalLink className="mr-2 h-4 w-4" />
                   View on Explorer
@@ -275,12 +354,12 @@ export function CrossChainWalletModal({ isOpen, onClose, view }: CrossChainWalle
                 variant="destructive"
                 className="w-full"
                 onClick={() => {
-                  disconnectSlushWallet()
+                  handleSuiDisconnect()
                   onClose()
                 }}
               >
                 <LogOut className="mr-2 h-4 w-4" />
-                Disconnect Slush Wallet
+                Disconnect {suiWallet?.name || "Sui Wallet"}
               </Button>
             </div>
           </>

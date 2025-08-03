@@ -10,22 +10,40 @@ import { ChevronDown, Search } from "lucide-react"
 import { useCrossChainTokens, type CrossChainToken } from "./cross-chain-token-provider"
 
 interface CrossChainTokenSelectorProps {
-  selectedToken: CrossChainToken
-  onSelectToken: (token: CrossChainToken) => void
+  selectedToken?: CrossChainToken
+  value?: CrossChainToken // Support both prop names for compatibility
+  onSelectToken?: (token: CrossChainToken) => void
+  onChange?: (token: CrossChainToken) => void // Support both prop names for compatibility
   otherToken?: CrossChainToken
-  label: string
+  label?: string
+  disabled?: boolean
 }
 
 export function CrossChainTokenSelector({
   selectedToken,
+  value,
   onSelectToken,
+  onChange,
   otherToken,
   label,
+  disabled = false,
 }: CrossChainTokenSelectorProps) {
   const { tokens, getTokensByChain } = useCrossChainTokens()
   const [isOpen, setIsOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
-  const [selectedChain, setSelectedChain] = useState<"BSC" | "SUI">(selectedToken.chain)
+  
+  // Support both prop names and provide safe defaults
+  const currentToken = selectedToken || value
+  const handleSelect = onSelectToken || onChange
+  
+  // Safe initialization with fallback
+  const [selectedChain, setSelectedChain] = useState<"BSC" | "SUI">(() => {
+    if (currentToken?.chain) {
+      return currentToken.chain
+    }
+    // Default to BSC if no token is provided
+    return "BSC"
+  })
 
   const filteredTokens = getTokensByChain(selectedChain).filter(
     (token) =>
@@ -35,7 +53,9 @@ export function CrossChainTokenSelector({
   )
 
   const handleTokenSelect = (token: CrossChainToken) => {
-    onSelectToken(token)
+    if (handleSelect) {
+      handleSelect(token)
+    }
     setIsOpen(false)
   }
 
@@ -44,21 +64,22 @@ export function CrossChainTokenSelector({
       <Button
         variant="outline"
         onClick={() => setIsOpen(true)}
+        disabled={disabled}
         className="flex items-center gap-2 bg-slate-600 border-slate-500 hover:bg-slate-500 hover:border-slate-400 text-white min-w-[140px]"
       >
         <div className="flex items-center gap-1">
           <img
-            src={selectedToken.logo || "/placeholder.svg"}
-            alt={selectedToken.name}
+            src={currentToken?.logo || "/placeholder.svg"}
+            alt={currentToken?.name || "Token"}
             className="h-5 w-5 rounded-full"
           />
           <img
-            src={selectedToken.chainLogo || "/placeholder.svg"}
-            alt={selectedToken.chain}
+            src={currentToken?.chainLogo || "/placeholder.svg"}
+            alt={currentToken?.chain || "Chain"}
             className="h-3 w-3 rounded-full"
           />
         </div>
-        <span>{selectedToken.symbol}</span>
+        <span>{currentToken?.symbol || "Select Token"}</span>
         <ChevronDown className="h-4 w-4 text-slate-400" />
       </Button>
 

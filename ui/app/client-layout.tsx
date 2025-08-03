@@ -9,6 +9,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { config } from "@/config/wagmi-config"
 import { SuiWalletProvider } from "@/components/sui-wallet-provider"
 import { CrossChainTokenProvider } from "@/components/cross-chain-token-provider"
+import { DemoBanner } from "@/components/demo/DemoBanner"
 
 const queryClient = new QueryClient()
 
@@ -32,7 +33,10 @@ export default function ClientLayout({
             <SuiWalletProvider>
               <CrossChainTokenProvider>
                 <ThemeProvider attribute="class" defaultTheme="dark">
-                  {children}
+                  <div className="min-h-screen">
+                    <DemoBanner />
+                    {children}
+                  </div>
                   <Toaster />
                 </ThemeProvider>
               </CrossChainTokenProvider>
